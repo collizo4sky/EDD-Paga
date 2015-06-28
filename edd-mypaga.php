@@ -18,7 +18,7 @@ class EDD_Paga {
 		add_action( 'edd_paga_cc_form', '__return_false' );
 		add_filter( 'edd_payment_gateways', array( $this, 'edd_register_gateway' ) );
 		add_action( 'edd_gateway_paga', array( $this, 'process_payment' ) );
-		add_action( 'init', array( $this, 'edd_listen_paga' ) );
+		add_action( 'plugins_loaded', array( $this, 'edd_listen_paga' ) );
 	}
 
 	// registers the gateway
@@ -76,6 +76,7 @@ class EDD_Paga {
 					$paga_cart[] = "<input type='hidden' name='subtotal[$key]' value='$item_price'>";
 				}
 
+				echo '<div style="text-align:center;margin:auto"><h3>Select your method of payment</h3></div>';
 				echo '<form method="post" id="submitPagaPayment" action="">';
 				echo implode( "\r\n", $paga_cart );
 				echo '</form>';
@@ -95,13 +96,12 @@ class EDD_Paga {
 	public function edd_listen_paga() {
 		global $edd_options;
 		$notification_private_key = 'pagaepay';
-		$merchant_key             = 'E2CQ2';
+		$merchant_key             = '9bfad767-abb7-4147-b407-5cec175daa9e';
 
 		if ( isset( $_GET['paga-status'] ) && $_GET['paga-status'] == 'check' ) {
 
-			if ( isset( $_POST['Status'] ) && $_POST['Status'] == 'SUCCESS' ) {
+				$transaction_status = isset( $_POST['status'] ) ? $_POST['status'] : '';
 
-				$transaction_status = $_POST['Status'];
 				switch ( $transaction_status ) {
 					case 'SUCCESS':
 						edd_empty_cart();
@@ -126,7 +126,7 @@ class EDD_Paga {
 						$fail = 'Invalid Login Details';
 						break;
 					case 'ERROR_OTHER':
-						$fail = 'Transaction Failed. Kindly Try again';
+						$fail = 'Transaction Failed. Kindly Try again: Other error';
 						break;
 					default:
 						$fail = 'Transaction Failed. Kindly Try again';
@@ -138,13 +138,12 @@ class EDD_Paga {
 					edd_record_gateway_error( 'Paga Error', "There was an error while processing a Paga payment. Payment error $fail" );
 					edd_send_back_to_checkout( '?payment-mode=paga' );
 				}
-			}
 		}
 
 		// Paga notification used for completing orders.
 		if ( isset( $_GET['edd-listener'] ) && $_GET['edd-listener'] == 'PAGAIPN' ) {
 			if ( $_POST['notification_private_key'] == $notification_private_key && $_POST['merchant_key'] == $merchant_key ) {
-				edd_update_payment_status( $_POST['transaction_id'], 'publish' );
+				edd_update_payment_status( absint($_POST['transaction_id']), 'publish' );
 			}
 		}
 
