@@ -175,12 +175,12 @@ class EDD_Paga {
 			// log the notification
 			$this->log_notification( $_POST );
 
-			$invoice_id     = absint( $_POST['invoice'] );
+			$invoice_id   = absint( $_POST['invoice'] );
 			$trans_amount = absint( $_POST['amount'] );
-			$order_amount = absint(edd_get_payment_amount( $invoice_id ));
+			$order_amount = absint( edd_get_payment_amount( $invoice_id ) );
 
 			if ( $_POST['notification_private_key'] == $notification_private_key && $_POST['merchant_key'] == $merchant_key ) {
-				if ( $order_amount <= $trans_amount && false === $_POST['test'] ) {
+				if ( $order_amount <= $trans_amount && 'false' == $_POST['test'] ) {
 					edd_update_payment_status( $invoice_id, 'publish' );
 				}
 			}
@@ -188,7 +188,7 @@ class EDD_Paga {
 	}
 
 	public function log_notification( $data ) {
-		$date = date_i18n( 'M j, Y @ G:i', current_time('timestamp') );
+		$date = date_i18n( 'M j, Y @ G:i', current_time( 'timestamp' ) );
 
 		$data     = is_array( $data ) || is_object( $data ) ? json_encode( $data ) : $data;
 		$resource = fopen( EDD_PAGA_ROOT . 'notification.log', 'a+' );
