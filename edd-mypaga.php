@@ -10,6 +10,8 @@ Author URI: http://w3guy.com
 License: GPL2
 */
 
+define( 'EDD_PAGA_ROOT', plugin_dir_path( __FILE__ ) );
+
 class EDD_Paga {
 
 	public function __construct() {
@@ -18,7 +20,31 @@ class EDD_Paga {
 		add_action( 'edd_paga_cc_form', '__return_false' );
 		add_filter( 'edd_payment_gateways', array( $this, 'edd_register_gateway' ) );
 		add_action( 'edd_gateway_paga', array( $this, 'process_payment' ) );
-		add_action( 'plugins_loaded', array( $this, 'edd_listen_paga' ) );
+		add_action( 'parse_request', array( $this, 'verify_order' ) );
+		add_action( 'init', array( $this, 'edd_listen_paga' ) );
+		add_filter( 'edd_currencies', array( $this, 'naira_currency' ) );
+		add_filter( 'edd_ngn_currency_filter_before', array( $this, 'currency_in_price' ), 10, 3 );
+		add_filter( 'edd_format_amount_decimals', array( $this, 'remove_delcimal' ) );
+	}
+
+	public function remove_delcimal( $decimals ) {
+		$decimals = 0;
+
+		return $decimals;
+	}
+
+	public function naira_currency( $currencies ) {
+		$currencies['NGN'] = __( 'Nigerian Naira (&#8358;)', 'edd_paga' );
+
+		return $currencies;
+	}
+
+	public function currency_in_price( $formatted, $currency, $price ) {
+		if ( 'NGN' == $currency ) {
+			$formatted = '&#8358;' . ' ' . $price;
+		}
+
+		return $formatted;
 	}
 
 	// registers the gateway
@@ -93,66 +119,85 @@ class EDD_Paga {
 	}
 
 
-	public function edd_listen_paga() {
-		global $edd_options;
-		$notification_private_key = 'pagaepay';
-		$merchant_key             = '9bfad767-abb7-4147-b407-5cec175daa9e';
+	public function verify_order() {
 
 		if ( isset( $_GET['paga-status'] ) && $_GET['paga-status'] == 'check' ) {
 
-				$transaction_status = isset( $_POST['status'] ) ? $_POST['status'] : '';
+			$transaction_status = isset( $_POST['status'] ) ? $_POST['status'] : '';
 
-				switch ( $transaction_status ) {
-					case 'SUCCESS':
-						edd_empty_cart();
-						edd_send_to_success_page();
-						break;
-					case 'ERROR_TIMEOUT':
-						$fail = 'Payment Transaction Timeout. Try again later.';
-						break;
-					case 'ERROR_INVALID_CUSTOMER_ACCOUNT':
-						$fail = 'Invalid Customer Account';
-						break;
-					case 'ERROR_CANCELLED':
-						$fail = 'Transaction was cancelled.';
-						break;
-					case 'ERROR_BELOW_MINIMUM':
-						$fail = 'The order amount is below the minimum allowed. Contact the merchant.';
-						break;
-					case 'ERROR_ABOVE_MAXINUM':
-						$fail = 'The order amount is above the maximum allowed. Contact the merchant.';
-						break;
-					case 'ERROR_AUTHENTICATION':
-						$fail = 'Invalid Login Details';
-						break;
-					case 'ERROR_OTHER':
-						$fail = 'Transaction Failed. Kindly Try again: Other error';
-						break;
-					default:
-						$fail = 'Transaction Failed. Kindly Try again';
-						break;
-				}
+			switch ( $transaction_status ) {
+				case 'SUCCESS':
+					edd_empty_cart();
+					edd_send_to_success_page();
+					break;
+				case 'ERROR_TIMEOUT':
+					$fail = 'Payment Transaction Timeout. Try again later.';
+					break;
+				case 'ERROR_INVALID_CUSTOMER_ACCOUNT':
+					$fail = 'Invalid Customer Account';
+					break;
+				case 'ERROR_CANCELLED':
+					$fail = 'Transaction was cancelled.';
+					break;
+				case 'ERROR_BELOW_MINIMUM':
+					$fail = 'The order amount is below the minimum allowed. Contact the merchant.';
+					break;
+				case 'ERROR_ABOVE_MAXINUM':
+					$fail = 'The order amount is above the maximum allowed. Contact the merchant.';
+					break;
+				case 'ERROR_AUTHENTICATION':
+					$fail = 'Invalid Login Details';
+					break;
+				case 'ERROR_OTHER':
+					$fail = 'Transaction Failed. Kindly Try again: Other error';
+					break;
+				default:
+					$fail = 'Transaction Failed. Kindly Try again';
+					break;
+			}
 
-				if(!empty($fail)) {
-					edd_set_error( 'payment_error', $fail );
-					edd_record_gateway_error( 'Paga Error', "There was an error while processing a Paga payment. Payment error $fail" );
-					edd_send_back_to_checkout( '?payment-mode=paga' );
-				}
-		}
-
-		// Paga notification used for completing orders.
-		if ( isset( $_GET['edd-listener'] ) && $_GET['edd-listener'] == 'PAGAIPN' ) {
-			if ( $_POST['notification_private_key'] == $notification_private_key && $_POST['merchant_key'] == $merchant_key ) {
-				edd_update_payment_status( absint($_POST['transaction_id']), 'publish' );
+			if ( ! empty( $fail ) ) {
+				edd_set_error( 'payment_error', $fail );
+				edd_record_gateway_error( 'Paga Error', "There was an error while processing a Paga payment. Payment error $fail" );
+				edd_send_back_to_checkout( '?payment-mode=paga' );
 			}
 		}
 
 	}
+
+
+	public function edd_listen_paga() {
+		$notification_private_key = 'pagaepay';
+		$merchant_key             = '9bfad767-abb7-4147-b407-5cec175daa9e';
+
+		// Paga notification used for completing orders.
+		if ( isset( $_GET['edd-listener'] ) && $_GET['edd-listener'] == 'PAGAIPN' ) {
+			// log the notification
+			$this->log_notification( $_POST );
+
+			$invoice_id     = absint( $_POST['invoice'] );
+			$trans_amount = absint( $_POST['amount'] );
+			$order_amount = absint(edd_get_payment_amount( $invoice_id ));
+
+			if ( $_POST['notification_private_key'] == $notification_private_key && $_POST['merchant_key'] == $merchant_key ) {
+				if ( $order_amount <= $trans_amount && false === $_POST['test'] ) {
+					edd_update_payment_status( $invoice_id, 'publish' );
+				}
+			}
+		}
+	}
+
+	public function log_notification( $data ) {
+		$date = date_i18n( 'M j, Y @ G:i', current_time('timestamp') );
+
+		$data     = is_array( $data ) || is_object( $data ) ? json_encode( $data ) : $data;
+		$resource = fopen( EDD_PAGA_ROOT . 'notification.log', 'a+' );
+		fwrite( $resource, "$date: $data" . "\r\n" );
+		fclose( $resource );
+	}
 }
 
 
-add_action( 'plugins_loaded', 'paga_plugin' );
+$instance = new EDD_Paga();
 
-function paga_plugin() {
-	new EDD_Paga();
-}
+
