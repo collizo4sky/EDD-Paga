@@ -16,15 +16,20 @@ class EDD_Paga {
 
 	public function __construct() {
 
-
 		add_action( 'edd_paga_cc_form', '__return_false' );
-		add_filter( 'edd_payment_gateways', array( $this, 'edd_register_gateway' ) );
+		add_filter( 'edd_payment_gateways', array( $this, 'register_gateway' ) );
 		add_action( 'edd_gateway_paga', array( $this, 'process_payment' ) );
 		add_action( 'parse_request', array( $this, 'verify_order' ) );
 		add_action( 'init', array( $this, 'edd_listen_paga' ) );
 		add_filter( 'edd_currencies', array( $this, 'naira_currency' ) );
 		add_filter( 'edd_ngn_currency_filter_before', array( $this, 'currency_in_price' ), 10, 3 );
 		add_filter( 'edd_format_amount_decimals', array( $this, 'remove_delcimal' ) );
+
+		// phone number field
+		add_action( 'edd_purchase_form_user_info', array( $this, 'phone_number_checkout_field' ) );
+		add_action( 'edd_checkout_error_checks', array( $this, 'validate_phone_number' ), 10, 2 );
+		add_filter( 'edd_payment_meta', array( $this, 'store_phone_number_fields' ) );
+		add_action( 'edd_payment_personal_details_list', array( $this, 'display_phone_number_purchase_details' ), 10, 2 );
 	}
 
 	public function remove_delcimal( $decimals ) {
@@ -47,8 +52,44 @@ class EDD_Paga {
 		return $formatted;
 	}
 
+	// output our custom field HTML
+	public function phone_number_checkout_field() {
+		?>
+		<p id="edd-paga-phone-wrap">
+			<label class="edd-label" for="edd-paga-phone"><?php _e( 'Phone Number', 'edd_paga' ); ?> <span class="edd-required-indicator">*</span></label>
+			<span class="edd-description"><?php _e( 'Enter your phone number', 'edd_paga' ); ?></span>
+			<input class="edd-input" type="text" name="edd_paga_phone" id="edd-paga-phone" placeholder="<?php _e( 'Phone Number', 'edd_paga' ); ?>" value=""/>
+		</p>
+	<?php
+	}
+
+
+	/** check for errors in phone number custom field */
+	public function validate_phone_number( $valid_data, $data ) {
+		if ( empty( $data['edd_paga_phone'] ) ) {
+			edd_set_error( 'empty_phone', __( 'Please provide your phone number.', 'edd_paga' ) );
+		}
+	}
+
+
+	/** store the custom field data in the payment meta */
+	public function store_phone_number_fields( $payment_meta ) {
+		$payment_meta['phone'] = isset( $_POST['edd_paga_phone'] ) ? sanitize_text_field( $_POST['edd_paga_phone'] ) : '';
+
+		return $payment_meta;
+	}
+
+
+	/** show the phone number field in the "View Order Details" popup */
+	public function display_phone_number_purchase_details( $payment_meta, $user_info ) {
+		$phone = isset( $payment_meta['phone'] ) ? $payment_meta['phone'] : 'none';
+		?>
+		<li><?php echo __( 'Phone:', 'edd_paga' ) . ' ' . $phone; ?></li>
+	<?php
+	}
+
 	// registers the gateway
-	public function edd_register_gateway( $gateways ) {
+	public function register_gateway( $gateways ) {
 		$gateways['paga'] = array( 'admin_label' => 'Paga', 'checkout_label' => __( 'Paga', 'edd_paga' ) );
 
 		return $gateways;
@@ -86,7 +127,12 @@ class EDD_Paga {
 
 				$paga_cart    = array();
 				$success_page = home_url( 'index.php?paga-status=check' );
+				$firstName    = $purchase_data['user_info']['first_name'];
+				$lastName     = $purchase_data['user_info']['last_name'];
+				$phoneNumber  = $purchase_data['post_data']['edd_paga_phone'];
 
+				$paga_cart[] = "<input type='hidden' name='customerName' value='$firstName $lastName'>";
+				$paga_cart[] = "<input type='hidden' name='phoneNumber' value='$phoneNumber'>";
 				$paga_cart[] = "<input type='hidden' name='email' value='" . $purchase_data['user_email'] . "'>";
 				$paga_cart[] = "<input type='hidden' name='invoice' value='$payment'>";
 				$paga_cart[] = "<input type='hidden' name='return_url' value='$success_page'>";
@@ -103,7 +149,7 @@ class EDD_Paga {
 				}
 
 				echo '<div style="text-align:center;margin:auto"><h3>Select your method of payment</h3></div>';
-				echo '<form method="post" id="submitPagaPayment" action="">';
+				echo '<form action="post">';
 				echo implode( "\r\n", $paga_cart );
 				echo '</form>';
 				echo '<script type="text/javascript" src="https://www.mypaga.com/paga-web/epay/ePay-start.paga?k=9bfad767-abb7-4147-b407-5cec175daa9e&amp;e=false&layout=H"></script>';
