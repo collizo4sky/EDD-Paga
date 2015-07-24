@@ -143,7 +143,7 @@ class EDD_Paga {
 
 				foreach ( $purchase_data['cart_details'] as $key => $item ) {
 					$item_name   = $item['name'];
-					$item_price  = $item['item_price'];
+					$item_price  = $item['price'];
 					$paga_cart[] = "<input type='hidden' name='description[$key]' value='$item_name'>";
 					$paga_cart[] = "<input type='hidden' name='subtotal[$key]' value='$item_price'>";
 				}
