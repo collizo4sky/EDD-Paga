@@ -213,8 +213,8 @@ class EDD_Paga {
 
 
 	public function edd_listen_paga() {
-		$notification_private_key = 'pagaepay';
-		$merchant_key             = '9bfad767-abb7-4147-b407-5cec175daa9e';
+		$notification_private_key = '';
+		$merchant_key             = '';
 
 		// Paga notification used for completing orders.
 		if ( isset( $_GET['edd-listener'] ) && $_GET['edd-listener'] == 'PAGAIPN' ) {
