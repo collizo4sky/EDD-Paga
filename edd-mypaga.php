@@ -3,10 +3,10 @@
 /*
 Plugin Name: EDD Paga
 Plugin URI: http://w3guy.com
-Description: A brief description of the Plugin.
+Description: Accept Credit Card payments in your Easy Digital Downloads store via Paga
 Version: 1.0
-Author: collizo4sky
-Author URI: http://w3guy.com
+Author: Collins Agbonghama
+Author URI: https://w3guy.com
 License: GPL2
 */
 
@@ -152,7 +152,7 @@ class EDD_Paga {
 				echo '<form action="post">';
 				echo implode( "\r\n", $paga_cart );
 				echo '</form>';
-				echo '<script type="text/javascript" src="https://www.mypaga.com/paga-web/epay/ePay-start.paga?k=9bfad767-abb7-4147-b407-5cec175daa9e&amp;e=false&layout=H"></script>';
+				echo '<script type="text/javascript" src="https://www.mypaga.com/paga-web/epay/ePay-start.paga?k=89bfad767-abb7-4147-b407-5cec175daa9e8&amp;e=false&layout=H"></script>';
 			}
 		} else {
 			$fail = true;
